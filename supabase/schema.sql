@@ -1,4 +1,5 @@
--- Ejecuta este archivo completo en Supabase > SQL Editor.
+-- Ejecuta este archivo completo SOLO al crear una base nueva.
+-- Si tu Supabase actual ya funciona, no necesitas volver a crear las tablas.
 
 create extension if not exists pgcrypto;
 
@@ -8,7 +9,7 @@ create table if not exists public.guests (
   email text,
   max_accesses integer not null default 1 check (max_accesses between 1 and 999),
   used_accesses integer not null default 0 check (used_accesses >= 0),
-  qr_color text not null default '#A855F7' check (qr_color ~ '^#[0-9A-Fa-f]{6}$'),
+  qr_color text not null default '#74347E' check (qr_color ~ '^#[0-9A-Fa-f]{6}$'),
   token text unique not null,
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -32,8 +33,6 @@ create index if not exists access_logs_created_at_idx on public.access_logs(crea
 alter table public.guests enable row level security;
 alter table public.access_logs enable row level security;
 
--- No creamos políticas públicas. El panel usa una Route API del servidor con la Service Role.
-
 create or replace function public.redeem_qr_access(
   p_token text,
   p_ip text default null,
@@ -56,16 +55,19 @@ as $$
 declare
   v_guest public.guests%rowtype;
 begin
-  select * into v_guest
-  from public.guests
-  where token = p_token
+  select g.*
+  into v_guest
+  from public.guests as g
+  where g.token = p_token
   for update;
 
   if not found then
     insert into public.access_logs(guest_id, scanned_token, status, ip, user_agent)
     values (null, p_token, 'denied_invalid', p_ip, p_user_agent);
 
-    return query select 'denied_invalid'::text, null::uuid, null::text, null::integer, null::integer, null::integer, null::text, null::boolean;
+    return query
+    select 'denied_invalid'::text, null::uuid, null::text, null::integer,
+           null::integer, null::integer, null::text, null::boolean;
     return;
   end if;
 
@@ -73,8 +75,11 @@ begin
     insert into public.access_logs(guest_id, scanned_token, status, ip, user_agent)
     values (v_guest.id, p_token, 'denied_inactive', p_ip, p_user_agent);
 
-    return query select 'denied_inactive'::text, v_guest.id, v_guest.name, v_guest.max_accesses, v_guest.used_accesses,
-      greatest(v_guest.max_accesses - v_guest.used_accesses, 0), v_guest.qr_color, v_guest.active;
+    return query
+    select 'denied_inactive'::text, v_guest.id, v_guest.name,
+           v_guest.max_accesses, v_guest.used_accesses,
+           greatest(v_guest.max_accesses - v_guest.used_accesses, 0),
+           v_guest.qr_color, v_guest.active;
     return;
   end if;
 
@@ -82,21 +87,27 @@ begin
     insert into public.access_logs(guest_id, scanned_token, status, ip, user_agent)
     values (v_guest.id, p_token, 'denied_exhausted', p_ip, p_user_agent);
 
-    return query select 'denied_exhausted'::text, v_guest.id, v_guest.name, v_guest.max_accesses, v_guest.used_accesses, 0, v_guest.qr_color, v_guest.active;
+    return query
+    select 'denied_exhausted'::text, v_guest.id, v_guest.name,
+           v_guest.max_accesses, v_guest.used_accesses, 0,
+           v_guest.qr_color, v_guest.active;
     return;
   end if;
 
-  update public.guests
-  set used_accesses = used_accesses + 1,
+  update public.guests as g
+  set used_accesses = g.used_accesses + 1,
       updated_at = now()
-  where id = v_guest.id
-  returning * into v_guest;
+  where g.id = v_guest.id
+  returning g.* into v_guest;
 
   insert into public.access_logs(guest_id, scanned_token, status, ip, user_agent)
   values (v_guest.id, p_token, 'granted', p_ip, p_user_agent);
 
-  return query select 'granted'::text, v_guest.id, v_guest.name, v_guest.max_accesses, v_guest.used_accesses,
-    greatest(v_guest.max_accesses - v_guest.used_accesses, 0), v_guest.qr_color, v_guest.active;
+  return query
+  select 'granted'::text, v_guest.id, v_guest.name,
+         v_guest.max_accesses, v_guest.used_accesses,
+         greatest(v_guest.max_accesses - v_guest.used_accesses, 0),
+         v_guest.qr_color, v_guest.active;
 end;
 $$;
 

@@ -1,10 +1,12 @@
 import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { EVENT_CONFIG } from '@/lib/event-config'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 type Props = { params: Promise<{ token: string }> }
+
 type Result = {
   status: string
   guest_id: string | null
@@ -22,32 +24,132 @@ export default async function QrAccessPage({ params }: Props) {
   const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || null
   const userAgent = h.get('user-agent') || null
   const db = createAdminClient()
-  const { data, error } = await db.rpc('redeem_qr_access', { p_token: token, p_ip: ip, p_user_agent: userAgent })
+
+  const { data, error } = await db.rpc('redeem_qr_access', {
+    p_token: token,
+    p_ip: ip,
+    p_user_agent: userAgent,
+  })
+
   const result = (Array.isArray(data) ? data[0] : data) as Result | undefined
 
   if (error || !result) {
-    return <Scan status="error" title="No se pudo validar" description="Intenta nuevamente o solicita ayuda al administrador." />
+    return (
+      <AccessResult
+        variant="error"
+        title="No se pudo validar"
+        description="Intenta nuevamente o solicita ayuda al administrador."
+      />
+    )
   }
+
   if (result.status === 'granted') {
-    return <Scan status="granted" title="Acceso autorizado" name={result.name || ''} remaining={result.remaining_accesses ?? 0} description="El acceso quedó registrado correctamente." />
+    return (
+      <AccessResult
+        variant="ok"
+        title="Acceso autorizado"
+        name={result.name || ''}
+        assigned={result.max_accesses ?? 0}
+        used={result.used_accesses ?? 0}
+        remaining={result.remaining_accesses ?? 0}
+        description="El acceso quedó registrado correctamente."
+      />
+    )
   }
+
   if (result.status === 'denied_exhausted') {
-    return <Scan status="denied" title="Sin accesos disponibles" name={result.name || ''} remaining={0} description="Este código ya utilizó todos los accesos asignados." />
+    return (
+      <AccessResult
+        variant="denied"
+        title="Sin accesos disponibles"
+        name={result.name || ''}
+        assigned={result.max_accesses ?? 0}
+        used={result.used_accesses ?? 0}
+        remaining={0}
+        description="Este código ya utilizó todos los accesos asignados."
+      />
+    )
   }
+
   if (result.status === 'denied_inactive') {
-    return <Scan status="denied" title="Código desactivado" name={result.name || ''} description="El administrador desactivó temporalmente este código." />
+    return (
+      <AccessResult
+        variant="denied"
+        title="Código desactivado"
+        name={result.name || ''}
+        assigned={result.max_accesses ?? 0}
+        used={result.used_accesses ?? 0}
+        remaining={result.remaining_accesses ?? 0}
+        description="El administrador desactivó temporalmente este código."
+      />
+    )
   }
-  return <Scan status="denied" title="QR no válido" description="El código no existe o ya no está disponible." />
+
+  return (
+    <AccessResult
+      variant="denied"
+      title="QR no válido"
+      description="El código no existe o ya no está disponible."
+    />
+  )
 }
 
-function Scan({status,title,name,remaining,description}:{status:'granted'|'denied'|'error',title:string,name?:string,remaining?:number,description:string}){
-  const ok=status==='granted'
-  return <main className="scanWrap"><section className={`card scanCard ${ok?'scanGranted':'scanDenied'}`}>
-    <div className="scanIcon">{ok?'✓':'!'}</div>
-    <h1 style={{fontSize:'clamp(32px,8vw,54px)'}}>{title}</h1>
-    {name && <h2>{name}</h2>}
-    {remaining!==undefined && <><div className="bigNumber">{remaining}</div><p className="muted">acceso{remaining===1?'':'s'} restante{remaining===1?'':'s'}</p></>}
-    <p>{description}</p>
-    <p className="muted" style={{fontSize:13,marginBottom:0}}>La validación se registra al abrir este QR.</p>
-  </section></main>
+function AccessResult({
+  variant,
+  title,
+  name,
+  assigned,
+  used,
+  remaining,
+  description,
+}: {
+  variant: 'ok' | 'denied' | 'error'
+  title: string
+  name?: string
+  assigned?: number
+  used?: number
+  remaining?: number
+  description: string
+}) {
+  const ok = variant === 'ok'
+  const hasCounters = assigned !== undefined && used !== undefined && remaining !== undefined
+
+  return (
+    <main className="scanWrap eventScanWrap">
+      <section className={`eventScanCard ${ok ? 'eventScanOk' : 'eventScanDenied'}`}>
+        <div className="eventScanTop">{EVENT_CONFIG.title}</div>
+
+        <div className={`eventScanIcon ${ok ? 'eventScanIconOk' : 'eventScanIconDenied'}`}>
+          {ok ? '✓' : '!'}
+        </div>
+
+        <div className="eventScanStatus">{title}</div>
+
+        {name && <h1 className="eventScanName">{name}</h1>}
+
+        {hasCounters && (
+          <div className="eventScanCounters">
+            <div className="eventScanCounter">
+              <span>Accesos asignados</span>
+              <strong>{assigned}</strong>
+            </div>
+            <div className="eventScanCounter">
+              <span>Accesos utilizados</span>
+              <strong>{used}</strong>
+            </div>
+            <div className="eventScanCounter eventScanCounterMain">
+              <span>Accesos disponibles</span>
+              <strong>{remaining}</strong>
+            </div>
+          </div>
+        )}
+
+        <p className="eventScanDescription">{description}</p>
+
+        <div className="eventScanDivider" />
+        <p className="eventScanThanks">{EVENT_CONFIG.thankYouText}</p>
+        <p className="eventScanNote">La validación se registra al abrir este QR.</p>
+      </section>
+    </main>
+  )
 }
