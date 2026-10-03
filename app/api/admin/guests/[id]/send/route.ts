@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import nodemailer from 'nodemailer'
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { EVENT_CONFIG } from '@/lib/event-config'
@@ -11,9 +12,15 @@ export async function POST(request: NextRequest, context: Context) {
   const auth = await requireAdmin(request)
   if (!auth.ok) return auth.response
 
-  if (!process.env.RESEND_API_KEY || !process.env.FROM_EMAIL) {
+  const gmailUser = process.env.GMAIL_USER?.trim()
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '')
+
+  if (!gmailUser || !gmailAppPassword) {
     return NextResponse.json(
-      { error: 'Configura RESEND_API_KEY y FROM_EMAIL para enviar correos.' },
+      {
+        error:
+          'Configura GMAIL_USER y GMAIL_APP_PASSWORD en las variables de entorno para enviar correos.',
+      },
       { status: 400 },
     )
   }
@@ -50,20 +57,41 @@ export async function POST(request: NextRequest, context: Context) {
   const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/$/, '')
   const qrUrl = `${origin}/q/${guest.token}`
   const base64 = cardDataUrl.split(',')[1]
-  const accessText = guest.max_accesses === 1
-    ? 'Tienes 1 acceso asignado'
-    : `Tienes ${guest.max_accesses} accesos asignados`
+  const accessText =
+    guest.max_accesses === 1
+      ? 'Tienes 1 acceso asignado'
+      : `Tienes ${guest.max_accesses} accesos asignados`
 
-  const resend = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
+  const fromEmail = process.env.FROM_EMAIL?.trim() || `${EVENT_CONFIG.title} <${gmailUser}>`
+
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: gmailUser,
+      pass: gmailAppPassword,
     },
-    body: JSON.stringify({
-      from: process.env.FROM_EMAIL,
-      to: [guest.email],
+  })
+
+  try {
+    await transporter.sendMail({
+      from: fromEmail,
+      to: guest.email,
+      replyTo: gmailUser,
       subject: `Tu acceso digital - ${EVENT_CONFIG.title}`,
+      text: [
+        `Hola, ${guest.name}.`,
+        '',
+        `${EVENT_CONFIG.thankYouText}.`,
+        '',
+        `Te compartimos tu acceso digital para ${EVENT_CONFIG.title}.`,
+        `${accessText}.`,
+        '',
+        'Guarda la imagen adjunta y preséntala al momento de ingresar.',
+        '',
+        `Enlace de tu acceso: ${qrUrl}`,
+      ].join('\n'),
       html: `
         <div style="font-family:Arial,sans-serif;background:#f7edf5;padding:32px 16px;color:#4f2a57">
           <div style="max-width:620px;margin:0 auto;background:#fff9fd;border:1px solid #e3b7db;border-radius:24px;padding:32px">
@@ -73,26 +101,35 @@ export async function POST(request: NextRequest, context: Context) {
             <h2 style="margin:0 0 14px;color:#74347e">Hola, ${escapeHtml(guest.name)}</h2>
             <p style="line-height:1.6">${escapeHtml(EVENT_CONFIG.thankYouText)}.</p>
             <p style="line-height:1.6">Te compartimos tu acceso digital para <strong>${escapeHtml(EVENT_CONFIG.title)}</strong>.</p>
-            <p style="font-size:18px;color:#74347e"><strong>${accessText}.</strong></p>
+            <p style="font-size:18px;color:#74347e"><strong>${escapeHtml(accessText)}.</strong></p>
             <p style="line-height:1.6">Guarda la imagen adjunta y preséntala al momento de ingresar.</p>
             <div style="margin-top:24px;padding:16px;border-radius:14px;background:#f3d3eb">
               <div style="font-size:13px;color:#765a7d;margin-bottom:6px">También puedes abrir tu acceso desde este enlace:</div>
-              <a href="${qrUrl}" style="color:#74347e;word-break:break-all">${qrUrl}</a>
+              <a href="${escapeHtml(qrUrl)}" style="color:#74347e;word-break:break-all">${escapeHtml(qrUrl)}</a>
             </div>
           </div>
         </div>`,
       attachments: [
         {
           filename: `acceso-${safeFileName(guest.name)}.png`,
-          content: base64,
+          content: Buffer.from(base64, 'base64'),
+          contentType: 'image/png',
         },
       ],
-    }),
-  })
+    })
+  } catch (mailError) {
+    console.error('Error enviando correo con Gmail SMTP:', mailError)
 
-  if (!resend.ok) {
-    const details = await resend.text()
-    return NextResponse.json({ error: `No se pudo enviar el correo: ${details}` }, { status: 502 })
+    const message = mailError instanceof Error ? mailError.message : 'Error desconocido de Gmail SMTP.'
+
+    return NextResponse.json(
+      {
+        error:
+          `No se pudo enviar el correo con Gmail: ${message}. ` +
+          'Verifica GMAIL_USER, GMAIL_APP_PASSWORD y que la verificación en 2 pasos esté activada.',
+      },
+      { status: 502 },
+    )
   }
 
   return NextResponse.json({ ok: true })
