@@ -62,11 +62,11 @@ export default function AdminPage() {
     Promise.all(
       guests.map(async guest => {
         const src = await QRCode.toDataURL(`${origin}/q/${guest.token}`, {
-          width: 420,
-          margin: 2,
-          errorCorrectionLevel: 'H',
+          width: 720,
+          margin: 4,
+          errorCorrectionLevel: 'M',
           color: {
-            dark: guest.qr_color || '#74347E',
+            dark: ensureQrContrast(guest.qr_color || '#74347E'),
             light: '#FFFFFF',
           },
         })
@@ -434,4 +434,31 @@ function slug(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '') || 'invitado'
+}
+
+
+function ensureQrContrast(hex: string) {
+  const normalized = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#74347E'
+  let r = parseInt(normalized.slice(1, 3), 16)
+  let g = parseInt(normalized.slice(3, 5), 16)
+  let b = parseInt(normalized.slice(5, 7), 16)
+
+  // Oscurece gradualmente colores demasiado claros para conservar el tono
+  // seleccionado y mantener suficiente contraste contra el fondo blanco.
+  for (let i = 0; i < 12 && contrastAgainstWhite(r, g, b) < 5; i += 1) {
+    r = Math.round(r * 0.86)
+    g = Math.round(g * 0.86)
+    b = Math.round(b * 0.86)
+  }
+
+  return `#${[r, g, b].map(value => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+function contrastAgainstWhite(r: number, g: number, b: number) {
+  const linear = (value: number) => {
+    const channel = value / 255
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  }
+  const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+  return 1.05 / (luminance + 0.05)
 }

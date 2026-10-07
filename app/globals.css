@@ -695,3 +695,41 @@ h1 { font-size:clamp(30px,5vw,52px); line-height:1.02; margin-bottom:8px; }
   letter-spacing: .04em;
   font-size: 13px;
 }
+
+/* Mejoras específicas del lector QR */
+.scannerDetectionHint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #74347e;
+}
+
+.scannerCameraSelector {
+  margin-top: 14px;
+  display: grid;
+  gap: 7px;
+}
+
+.scannerCameraSelector label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #765a7d;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.scannerTips {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff4fb;
+  border: 1px solid #efd2e8;
+  display: grid;
+  gap: 4px;
+  color: #765a7d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scannerTips strong { color: #74347e; }

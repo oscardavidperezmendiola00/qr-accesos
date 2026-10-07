@@ -55,7 +55,11 @@ export async function createAccessCardDataUrl({ name, maxAccesses, qrDataUrl }: 
   ctx.stroke()
 
   const image = await loadImage(qrDataUrl)
+  // Evita suavizado/borrosidad al dibujar el QR: los módulos deben conservar bordes nítidos.
+  const smoothingBeforeQr = ctx.imageSmoothingEnabled
+  ctx.imageSmoothingEnabled = false
   ctx.drawImage(image, 180, 280, 720, 720)
+  ctx.imageSmoothingEnabled = smoothingBeforeQr
 
   // Nombre.
   ctx.fillStyle = EVENT_CONFIG.textColor
