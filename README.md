@@ -39,3 +39,8 @@ git push
 ```
 
 Vercel debería desplegar automáticamente.
+
+
+## Lector QR del administrador
+
+La ruta `/admin/scanner` usa la cámara para registrar entradas. Los QR nuevos apuntan a `/q/TOKEN` y no consumen accesos al abrirse; únicamente el lector autenticado descuenta un acceso. Consulta `LECTOR-QR.md`.

@@ -214,7 +214,10 @@ export default function AdminPage() {
           <div className="brand"><span className="brandDot" /> QR Accesos</div>
           <div className="eventBrand">{EVENT_CONFIG.title}</div>
         </div>
-        <button className="btn btnSoft" onClick={logout}>Cerrar sesión</button>
+        <div className="topbarActions">
+          <button className="btn btnPrimary" onClick={() => router.push('/admin/scanner')}>Abrir lector QR</button>
+          <button className="btn btnSoft" onClick={logout}>Cerrar sesión</button>
+        </div>
       </div>
 
       <section className="eventHero">
@@ -360,7 +363,7 @@ export default function AdminPage() {
                         </button>
 
                         <button className="btn btnSoft" onClick={() => copyLink(guest)}>
-                          Copiar enlace
+                          Copiar enlace de consulta
                         </button>
 
                         {guest.email && (

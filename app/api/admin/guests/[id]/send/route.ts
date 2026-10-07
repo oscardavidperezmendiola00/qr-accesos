@@ -55,7 +55,7 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/$/, '')
-  const qrUrl = `${origin}/q/${guest.token}`
+  const previewUrl = `${origin}/q/${guest.token}`
   const base64 = cardDataUrl.split(',')[1]
   const accessText =
     guest.max_accesses === 1
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, context: Context) {
         '',
         'Guarda la imagen adjunta y preséntala al momento de ingresar.',
         '',
-        `Enlace de tu acceso: ${qrUrl}`,
+        `Consulta tu acceso sin descontarlo: ${previewUrl}`,
       ].join('\n'),
       html: `
         <div style="font-family:Arial,sans-serif;background:#f7edf5;padding:32px 16px;color:#4f2a57">
@@ -104,8 +104,8 @@ export async function POST(request: NextRequest, context: Context) {
             <p style="font-size:18px;color:#74347e"><strong>${escapeHtml(accessText)}.</strong></p>
             <p style="line-height:1.6">Guarda la imagen adjunta y preséntala al momento de ingresar.</p>
             <div style="margin-top:24px;padding:16px;border-radius:14px;background:#f3d3eb">
-              <div style="font-size:13px;color:#765a7d;margin-bottom:6px">También puedes abrir tu acceso desde este enlace:</div>
-              <a href="${escapeHtml(qrUrl)}" style="color:#74347e;word-break:break-all">${escapeHtml(qrUrl)}</a>
+              <div style="font-size:13px;color:#765a7d;margin-bottom:6px">Puedes consultar el estado de tu acceso desde este enlace (no descuenta accesos):</div>
+              <a href="${escapeHtml(previewUrl)}" style="color:#74347e;word-break:break-all">${escapeHtml(previewUrl)}</a>
             </div>
           </div>
         </div>`,
