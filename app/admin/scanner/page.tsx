@@ -14,6 +14,7 @@ type RedeemResult = {
   remaining_accesses: number | null
   qr_color: string | null
   active: boolean | null
+  attendance_marked?: boolean
 }
 
 type ScannerInstance = {
@@ -98,7 +99,7 @@ export default function ScannerPage() {
 
   async function stopCamera() {
     const scanner = scannerRef.current
-    if (!scanner || !cameraActive) return
+    if (!scanner) return
 
     try {
       await scanner.stop()
@@ -132,6 +133,9 @@ export default function ScannerPage() {
       if (!response.ok) throw new Error(json.error || 'No se pudo registrar el acceso.')
 
       setResult(json.result)
+      if (json.result?.status === 'granted' && json.result?.attendance_marked) {
+        if ('vibrate' in navigator) navigator.vibrate(120)
+      }
     } catch (e) {
       if (!(e instanceof Error && e.message === 'SESSION')) {
         setError(e instanceof Error ? e.message : 'No se pudo leer el QR.')
@@ -307,7 +311,12 @@ export default function ScannerPage() {
                   <div className="scannerCounterMain"><span>Disponibles</span><strong>{result.remaining_accesses ?? 0}</strong></div>
                 </div>
 
-                {granted && <p className="scannerResultMessage">Entrada registrada correctamente.</p>}
+                {granted && (
+                  <>
+                    <div className="scannerAttendanceBadge">✓ ASISTENCIA REGISTRADA</div>
+                    <p className="scannerResultMessage">Se descontó exactamente 1 acceso.</p>
+                  </>
+                )}
                 {denied && <p className="scannerResultMessage">No se descontó ningún acceso adicional.</p>}
 
                 <button className="btn btnPrimary scannerNextButton" onClick={scanNext}>

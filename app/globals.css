@@ -681,3 +681,17 @@ h1 { font-size:clamp(30px,5vw,52px); line-height:1.02; margin-bottom:8px; }
   .scannerCounters > div { display: flex; align-items: center; justify-content: space-between; }
   .scannerCounters strong { margin-top: 0; }
 }
+
+/* Confirmación visible de asistencia desde el lector QR */
+.scannerAttendanceBadge {
+  margin: 18px auto 8px;
+  width: fit-content;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #e9f9ef;
+  color: #16723a;
+  border: 1px solid #bce7ca;
+  font-weight: 900;
+  letter-spacing: .04em;
+  font-size: 13px;
+}
